@@ -56,6 +56,12 @@ CONTAINS
         LocalVar%PC_KD = interp1d(CntrPar%PC_GS_angles, CntrPar%PC_GS_KD, LocalVar%PC_PitComTF, ErrVar) ! Derivative gain
         LocalVar%PC_TF = interp1d(CntrPar%PC_GS_angles, CntrPar%PC_GS_TF, LocalVar%PC_PitComTF, ErrVar) ! TF gains (derivative filter) !NJA - need to clarify
         
+        ! Find Power Tracking Control contribution
+        IF (CntrPar%PTC_Control>=1) THEN 
+            CALL PTC_bladePitch(CntrPar,LocalVar)
+            !Update the LocalVar%PC_SpdErr for the PIController
+        END IF
+
         ! Compute the collective pitch command associated with the proportional and integral gains:
         LocalVar%PC_PitComT = PIController(LocalVar%PC_SpdErr, LocalVar%PC_KP, LocalVar%PC_KI, LocalVar%PC_MinPit, LocalVar%PC_MaxPit, LocalVar%DT, LocalVar%BlPitch(1), LocalVar%piP, LocalVar%restart, objInst%instPI)
         DebugVar%PC_PICommand = LocalVar%PC_PitComT
@@ -152,6 +158,7 @@ CONTAINS
 
         CHARACTER(*),               PARAMETER           :: RoutineName = 'VariableSpeedControl'
 
+
         ! Allocate Variables
         
         ! -------- Variable-Speed Torque Controller --------
@@ -173,7 +180,7 @@ CONTAINS
             ! PI controller
             LocalVar%GenTq = PIController(LocalVar%VS_SpdErr, CntrPar%VS_KP(1), CntrPar%VS_KI(1), CntrPar%VS_MinTq, LocalVar%VS_MaxTq, LocalVar%DT, LocalVar%VS_LastGenTrq, LocalVar%piP, LocalVar%restart, objInst%instPI)
             LocalVar%GenTq = saturate(LocalVar%GenTq, CntrPar%VS_MinTq, LocalVar%VS_MaxTq)
-        
+           
         ! K*Omega^2 control law with PI torque control in transition regions
         ELSE
             ! Update PI loops for region 1.5 and 2.5 PI control
@@ -197,6 +204,11 @@ CONTAINS
             LocalVar%GenTq = saturate(LocalVar%GenTq, CntrPar%VS_MinTq, CntrPar%VS_MaxTq)
         ENDIF
 
+        ! Find Power Tracking Control contribution
+        IF (CntrPar%PTC_Control>=1) THEN 
+            CALL PTC_genTorque(CntrPar,LocalVar)
+            !Update the LocalVar%GenTq
+        END IF
 
         ! Saturate the commanded torque using the maximum torque limit:
         LocalVar%GenTq = MIN(LocalVar%GenTq, CntrPar%VS_MaxTq)                    ! Saturate the command using the maximum torque limit
@@ -280,6 +292,51 @@ CONTAINS
         ENDIF
 
     END SUBROUTINE YawRateControl
+
+!-------------------------------------------------------------------------------------------------------------------------------
+    SUBROUTINE PTC_bladePitch(CntrPar, LocalVar)
+        ! Power tracking control subroutine
+        ! - Calculates the rotor speed reference and reset the speed and power errors
+
+        USE ROSCO_Types, ONLY : ControlParameters, LocalVariables
+
+        TYPE(ControlParameters),    INTENT(INOUT)       :: CntrPar
+        TYPE(LocalVariables),       INTENT(INOUT)       :: LocalVar
+        
+        ! Condition to either operate on power tracking mode or greedy mode. This is done for the turbine quick start and for possible saturation (where turbines must operate in greedy instead)
+        IF ((CntrPar%PTC_PowerRef<CntrPar%VS_RtPwr) .AND. ((LocalVar%GenSpeedF> LocalVar%PTC_RotorSpeedRef*CntrPar%WE_GearboxRatio).OR.(LocalVar%PC_PitComTF > CntrPar%PC_FinePit))) THEN
+            ! Replace the speed and power errors 
+            LocalVar%PC_SpdErr=LocalVar%PC_SpdErr - CntrPar%PC_RefSpd + ( LocalVar%PTC_RotorSpeedRef * CntrPar%WE_GearboxRatio)
+            LocalVar%PC_PwrErr=LocalVar%PC_PwrErr - CntrPar%VS_RtPwr + CntrPar%PTC_PowerRef
+        ENDIF
+    END SUBROUTINE PTC_bladePitch
+!-------------------------------------------------------------------------------------------------------------------------------
+    SUBROUTINE PTC_genTorque(CntrPar, LocalVar)
+        ! Power tracking control subroutine
+        ! - Calculates the generator torque
+
+        USE ROSCO_Types, ONLY : ControlParameters, LocalVariables
+
+        TYPE(ControlParameters),    INTENT(INOUT)       :: CntrPar
+        TYPE(LocalVariables),       INTENT(INOUT)       :: LocalVar
+
+        ! Local variables
+        REAL(8)                                  :: PTC_GenTq
+
+        ! Compute (interpolate) the rotor speed reference based on the power reference and lookup table: 
+        PTC_RotorSpeedRef = interp1d(CntrPar%PTC_Table_PowerRef, CntrPar%PTC_Table_RotorSpeedRef, CntrPar%PTC_PowerRef, ErrVar))
+        LocalVar%PTC_RotorSpeedRef = PTC_RotorSpeedRef
+        ! Condition to either operate on power tracking mode or greedy mode. This is done for the turbine quick start and for possible saturation (not enough power into the wind, where turbines must operate in greedy instead)
+        IF ((CntrPar%PTC_PowerRef<CntrPar%VS_RtPwr) .AND. ((LocalVar%GenSpeedF> LocalVar%PTC_RotorSpeedRef*CntrPar%WE_GearboxRatio).OR.(LocalVar%PC_PitComTF > CntrPar%PC_FinePit))) THEN
+            PTC_GenTq=CntrPar%PTC_PowerRef/(CntrPar%VS_GenEff/100.0))/LocalVar%GenSpeedF
+            IF (CntrPar%PTC_DR_Mode==1) THEN
+                LocalVar%GenTq = PTC_GenTq
+            ELSEIF (CntrPar%PTC_DR_Mode==2) THEN
+                LocalVar%GenTq = MIN(PTC_GenTq,LocalVar%GenTq)
+            ENDIF
+        ENDIF
+
+    END SUBROUTINE PTC_genTorque
 !-------------------------------------------------------------------------------------------------------------------------------
     SUBROUTINE IPC(CntrPar, LocalVar, objInst, DebugVar)
         ! Individual pitch control subroutine
