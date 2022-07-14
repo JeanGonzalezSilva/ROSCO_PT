@@ -242,6 +242,7 @@ CONTAINS
         CALL ReadEmptyLine(UnControllerParameters,CurLine)
         CALL ParseInput(UnControllerParameters,CurLine,'F_LPFType',accINFILE(1),CntrPar%F_LPFType,ErrVar)
         CALL ParseInput(UnControllerParameters,CurLine,'F_NotchType',accINFILE(1),CntrPar%F_NotchType,ErrVar)
+        CALL ParseInput(UnControllerParameters,CurLine,'PTC_ControlMode',accINFILE(1),CntrPar%PTC_ControlMode,ErrVar)
         CALL ParseInput(UnControllerParameters,CurLine,'IPC_ControlMode',accINFILE(1),CntrPar%IPC_ControlMode,ErrVar)
         CALL ParseInput(UnControllerParameters,CurLine,'VS_ControlMode',accINFILE(1),CntrPar%VS_ControlMode,ErrVar)
         CALL ParseInput(UnControllerParameters,CurLine,'PC_ControlMode',accINFILE(1),CntrPar%PC_ControlMode,ErrVar)
@@ -284,6 +285,15 @@ CONTAINS
         CALL ParseInput(UnControllerParameters,CurLine,'PC_RefSpd',accINFILE(1),CntrPar%PC_RefSpd,ErrVar)
         CALL ParseInput(UnControllerParameters,CurLine,'PC_FinePit',accINFILE(1),CntrPar%PC_FinePit,ErrVar)
         CALL ParseInput(UnControllerParameters,CurLine,'PC_Switch',accINFILE(1),CntrPar%PC_Switch,ErrVar)
+        CALL ReadEmptyLine(UnControllerParameters,CurLine)
+
+        !------------------- PTC CONSTANTS -----------------------
+        CALL ReadEmptyLine(UnControllerParameters,CurLine) 
+        CALL ParseInput(UnControllerParameters,CurLine,'PTC_DR_Mode',accINFILE(1),CntrPar%PTC_DR_Mode,ErrVar)
+        CALL ParseInput(UnControllerParameters,CurLine,'PTC_PowerSpeedTable_n',accINFILE(1),CntrPar%PTC_PowerSpeedTable_n,ErrVar)
+        CALL ParseAry(UnControllerParameters, CurLine, 'PTC_Table_RotorSpeedRef', CntrPar%PTC_Table_RotorSpeedRef, CntrPar%PTC_PowerSpeedTable_n, accINFILE(1), ErrVar )
+        CALL ParseAry(UnControllerParameters, CurLine, 'PTC_Table_PowerRef', CntrPar%PTC_Table_PowerRef, CntrPar%PTC_PowerSpeedTable_n, accINFILE(1), ErrVar ) 
+        CALL ParseInput(UnControllerParameters,CurLine,'PTC_PowerRef',accINFILE(1),CntrPar%PTC_PowerRef,ErrVar)
         CALL ReadEmptyLine(UnControllerParameters,CurLine)
 
         !------------------- IPC CONSTANTS -----------------------
