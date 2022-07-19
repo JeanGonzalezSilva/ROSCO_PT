@@ -28,7 +28,7 @@ TYPE, PUBLIC :: ControlParameters
     INTEGER(IntKi)                :: PTC_PowerSpeedTable_n       ! Number of interpolation table entries
     REAL(DbKi), DIMENSION(:), ALLOCATABLE      :: PTC_Table_RotorSpeedRef           ! Interpolation table: rotor speed, [rad/s].
     REAL(DbKi), DIMENSION(:), ALLOCATABLE      :: PTC_Table_PowerRef                ! Interpolation table: power reference, [W].
-    INTEGER(IntKi)                :: PTC_PowerRef                   ! Power reference value (single value for now)
+    REAL(DbKi)                    :: PTC_PowerRef                   ! Power reference value (single value for now)
     INTEGER(IntKi)                :: IPC_ControlMode             ! Turn Individual Pitch Control (IPC) for fatigue load reductions (pitch contribution) {0 - off, 1 - 1P reductions, 2 - 1P+2P reductions}
     REAL(DbKi)                    :: IPC_IntSat                  ! Integrator saturation (maximum signal amplitude contrbution to pitch from IPC)
     REAL(DbKi), DIMENSION(:), ALLOCATABLE     :: IPC_KP                      ! Integral gain for the individual pitch controller, [-].
@@ -217,6 +217,7 @@ TYPE, PUBLIC :: LocalVariables
     REAL(DbKi)                    :: PC_PwrErr                   ! Power error with respect to rated power [W]
     REAL(DbKi)                    :: PC_SpdErr                   ! Current speed error (pitch control) [rad/s].
     REAL(DbKi)                    :: PTC_RotorSpeedRef           ! Rotor speed reference [rad/s]
+    REAL(DbKi)                    :: PTC_GenTq                   ! Computed generator torque [Nm].
     REAL(DbKi)                    :: IPC_AxisTilt_1P             ! Integral of the direct axis, 1P
     REAL(DbKi)                    :: IPC_AxisYaw_1P              ! Integral of quadrature, 1P
     REAL(DbKi)                    :: IPC_AxisTilt_2P             ! Integral of the direct axis, 2P

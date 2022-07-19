@@ -57,7 +57,7 @@ CONTAINS
         LocalVar%PC_TF = interp1d(CntrPar%PC_GS_angles, CntrPar%PC_GS_TF, LocalVar%PC_PitComTF, ErrVar) ! TF gains (derivative filter) !NJA - need to clarify
         
         ! Find Power Tracking Control contribution
-        IF (CntrPar%PTC_Control>=1) THEN 
+        IF (CntrPar%PTC_ControlMode>=1) THEN 
             CALL PTC_bladePitch(CntrPar,LocalVar)
             !Update the LocalVar%PC_SpdErr for the PIController
         END IF
@@ -205,8 +205,8 @@ CONTAINS
         ENDIF
 
         ! Find Power Tracking Control contribution
-        IF (CntrPar%PTC_Control>=1) THEN 
-            CALL PTC_genTorque(CntrPar,LocalVar)
+        IF (CntrPar%PTC_ControlMode>=1) THEN 
+            CALL PTC_genTorque(CntrPar,LocalVar,ErrVar)
             !Update the LocalVar%GenTq
         END IF
 
@@ -311,28 +311,29 @@ CONTAINS
         ENDIF
     END SUBROUTINE PTC_bladePitch
 !-------------------------------------------------------------------------------------------------------------------------------
-    SUBROUTINE PTC_genTorque(CntrPar, LocalVar)
+    SUBROUTINE PTC_genTorque(CntrPar, LocalVar, ErrVar)
         ! Power tracking control subroutine
         ! - Calculates the generator torque
 
-        USE ROSCO_Types, ONLY : ControlParameters, LocalVariables
+        USE ROSCO_Types, ONLY : ControlParameters, LocalVariables, ErrorVariables
 
         TYPE(ControlParameters),    INTENT(INOUT)       :: CntrPar
         TYPE(LocalVariables),       INTENT(INOUT)       :: LocalVar
+        TYPE(ErrorVariables),       INTENT(INOUT)       :: ErrVar
 
         ! Local variables
-        REAL(8)                                  :: PTC_GenTq
+        REAL(8)                                  :: GenTq
 
         ! Compute (interpolate) the rotor speed reference based on the power reference and lookup table: 
-        PTC_RotorSpeedRef = interp1d(CntrPar%PTC_Table_PowerRef, CntrPar%PTC_Table_RotorSpeedRef, CntrPar%PTC_PowerRef, ErrVar))
-        LocalVar%PTC_RotorSpeedRef = PTC_RotorSpeedRef
+        LocalVar%PTC_RotorSpeedRef = interp1d(CntrPar%PTC_Table_PowerRef, CntrPar%PTC_Table_RotorSpeedRef, CntrPar%PTC_PowerRef, ErrVar)
+    
         ! Condition to either operate on power tracking mode or greedy mode. This is done for the turbine quick start and for possible saturation (not enough power into the wind, where turbines must operate in greedy instead)
         IF ((CntrPar%PTC_PowerRef<CntrPar%VS_RtPwr) .AND. ((LocalVar%GenSpeedF> LocalVar%PTC_RotorSpeedRef*CntrPar%WE_GearboxRatio).OR.(LocalVar%PC_PitComTF > CntrPar%PC_FinePit))) THEN
-            PTC_GenTq=CntrPar%PTC_PowerRef/(CntrPar%VS_GenEff/100.0))/LocalVar%GenSpeedF
+            LocalVar%PTC_GenTq =(CntrPar%PTC_PowerRef/(CntrPar%VS_GenEff/100.0))/LocalVar%GenSpeedF
             IF (CntrPar%PTC_DR_Mode==1) THEN
-                LocalVar%GenTq = PTC_GenTq
+                LocalVar%GenTq = LocalVar%PTC_GenTq
             ELSEIF (CntrPar%PTC_DR_Mode==2) THEN
-                LocalVar%GenTq = MIN(PTC_GenTq,LocalVar%GenTq)
+                LocalVar%GenTq = MIN(LocalVar%PTC_GenTq,LocalVar%GenTq)
             ENDIF
         ENDIF
 
